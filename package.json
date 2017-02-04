@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "start": "node node_modules/react-native/local-cli/cli.js start",
-    "test": "jest"
+    "test": "jest",
+    "postinstall": "react-native-port-patcher --new-port 8080",
+    "bundleAndroid": "node node_modules/react-native/local-cli/cli.js bundle --entry-file='index.android.js' --bundle-output='./android/app/src/main/assets/fonts/algo/main.jsbundle' --dev=false --platform='android' --assets-dest='./android'"
   },
   "dependencies": {
     "base-64": "^0.1.0",
@@ -33,6 +35,7 @@
     "babel-jest": "18.0.0",
     "babel-preset-react-native": "1.9.1",
     "jest": "18.1.0",
+    "react-native-port-patcher": "^1.0.2",
     "react-test-renderer": "15.4.2"
   },
   "jest": {

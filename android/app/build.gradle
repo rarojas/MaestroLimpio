@@ -131,8 +131,8 @@ dependencies {
         exclude group: 'com.google.android.gms', module: 'play-services-base'
         exclude group: 'com.google.android.gms', module: 'play-services-maps'
     }
-    compile 'com.google.android.gms:play-services-base:10.0.1'
-    compile 'com.google.android.gms:play-services-maps:10.0.1'
+    compile 'com.google.android.gms:play-services-base:9.2.0'
+    compile 'com.google.android.gms:play-services-maps:9.2.0'
 
     compile project(':react-native-i18n')
     compile fileTree(dir: "libs", include: ["*.jar"])

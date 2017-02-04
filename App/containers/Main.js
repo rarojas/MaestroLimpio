@@ -18,6 +18,8 @@ import Styles from '../components/Styles'
 import MapView from 'react-native-maps';
 import CarWash  from '../components/CarWash'
 const screen = Dimensions.get('window');
+import PanController from '../components/PanController';
+
 const ITEM_SPACING = 10;
 const ITEM_PREVIEW = 10;
 const ITEM_WIDTH = screen.width - (2 * ITEM_SPACING) - (2 * ITEM_PREVIEW);
@@ -27,13 +29,18 @@ const SCALE_END = screen.width / ITEM_WIDTH;
 const BREAKPOINT1 = 246;
 const BREAKPOINT2 = 350;
 const ONE = new Animated.Value(1);
-import PanController from '../components/PanController';
 
 const ASPECT_RATIO = screen.width / screen.height;
 const LATITUDE = 37.78825;
 const LONGITUDE = -122.4324;
 const LATITUDE_DELTA = 0.0922;
 const LONGITUDE_DELTA = LATITUDE_DELTA * ASPECT_RATIO;
+const defaultLatLng = { latitude: 19.435477, longitude: -99.136479}
+const defaultOpts =  { latitudeDelta: 0.0922, longitudeDelta: 0.0922}
+const DELTAMAX = 0.1000;
+const DELTAANGLE = 0.2
+const PI_2 = 3.1416 * 2
+const MAX_AMOUNT = 2000
 
 
 function getMarkerState(panX, panY, scrollY, i) {
@@ -129,44 +136,6 @@ function getMarkerState(panX, panY, scrollY, i) {
   };
 }
 
-const styles = StyleSheet.create({
- container: {
-   flex: 1,
-   justifyContent: 'flex-start',
-   alignItems: 'center',
- },
- title: {
-   color:"black"
- },
- map: {
-   alignItems: 'center',
-   marginTop: 20,
-   margin: 10,
-   flex: 1,
-   height: 200,
-   width: 300,
- },
- item: {
-   width: ITEM_WIDTH,
-   height: screen.height + (2 * ITEM_PREVIEW_HEIGHT),
-   backgroundColor: 'white',
-   marginHorizontal: ITEM_SPACING / 2,
-   overflow: 'hidden',
-   borderRadius: 3,
-   borderColor: '#000',
-   alignItems:"center",
- },
- itemContainer: {
-    backgroundColor: 'transparent',
-    flexDirection: 'row',
-    paddingHorizontal: (ITEM_SPACING / 2) + ITEM_PREVIEW,
-    position: 'absolute',
-    // top: screen.height - ITEM_PREVIEW_HEIGHT - 64,
-    paddingTop: screen.height - ITEM_PREVIEW_HEIGHT - 64,
-    // paddingTop: !ANDROID ? 0 : screen.height - ITEM_PREVIEW_HEIGHT - 64,
-  },
-});
-
 function mapStateToProps (state) {
   return {
    }
@@ -178,15 +147,6 @@ function mapDispatchToProps (dispatch) {
   }
 }
 
-const defaultLatLng = { latitude: 19.435477, longitude: -99.136479}
-const defaultOpts =  { latitudeDelta: 0.0011, longitudeDelta: 0.0111}
-const DELTAMAX = 0.01;
-const DELTAANGLE = 0.2
-const PI_2 = 3.1416 * 2
-const MAX_AMOUNT = 2000
-
-
-
 function generateElements(origin){
   var angle = 0// from 0 to 2 Pi
   var elementsArray = []
@@ -194,14 +154,17 @@ function generateElements(origin){
   if(origin){
     center = origin;
   }
+  var size = 0;
   while(angle < PI_2 ) {
     var element = { name : "Nombre", latlng : { ...center } }
     var deltaX = Math.sin(angle) * Math.random() * DELTAMAX;
     var deltaY = Math.cos(angle) * Math.random() * DELTAMAX;
-    element.latlng.latitude += deltaX;
-    element.latlng.longitude += deltaY;
-    element.amount = Math.round(Math.random() * MAX_AMOUNT, 2);
+    element.latlng.latitude += deltaX
+    element.latlng.longitude += deltaY
+    element.amount = Math.round(Math.random() * MAX_AMOUNT, 2)
+    element.id = size;
     elementsArray.push(element);
+    size++;
     angle += DELTAANGLE;
   }
   return elementsArray;
@@ -275,29 +238,28 @@ class Main extends React.Component {
     panX.addListener(this.onPanXChange);
     panY.addListener(this.onPanYChange);
 
-    region.stopAnimation();
-    region.timing({
-      latitude: scrollX.interpolate({
-        inputRange: carWash.map((m, i) => i * SNAP_WIDTH),
-        outputRange: carWash.map(m => m.latitude),
-      }),
-      longitude: scrollX.interpolate({
-        inputRange: carWash.map((m, i) => i * SNAP_WIDTH),
-        outputRange: carWash.map(m => m.longitude),
-      }),
-      duration: 0,
-    }).start();
     this.watchID = null;
     navigator.geolocation.getCurrentPosition(
        (position) => {
-        var elementsArray = generateElements(position.coords);
+         var elementsArray = generateElements(position.coords);
+         this.state.carWash = elementsArray;
          var initialPosition = JSON.stringify(position);
          this.state.initialPosition = initialPosition;
-         this.state.region = new MapView.AnimatedRegion({
-            latitude: position.coords.latitude | this.state.region.latitude,
-            longitude: position.coords.longitude | this.state.region.longitude,
-            ...defaultOpts
-          });
+         this.state.region.latitude = position.coords.latitude | this.state.region.latitude
+         this.state.region.longitude = position.coords.longitude | this.state.region.longitude
+
+         region.stopAnimation();
+         region.timing({
+           latitude: scrollX.interpolate({
+             inputRange: this.state.carWash.map((m, i) => i * SNAP_WIDTH),
+             outputRange: this.state.carWash.map(m => m.latlng.latitude),
+           }),
+           longitude: scrollX.interpolate({
+             inputRange: this.state.carWash.map((m, i) => i * SNAP_WIDTH),
+             outputRange: this.state.carWash.map(m => m.latlng.longitude),
+           }),
+           duration: 0,
+         }).start();
        },
        (error) => alert(JSON.stringify(error)),
        {enableHighAccuracy: true, timeout: 20000, maximumAge: 1000}
@@ -306,11 +268,8 @@ class Main extends React.Component {
        var elementsArray = generateElements(position.coords);
        var lastPosition = JSON.stringify(position);
        this.state.lastPosition = lastPosition;
-       this.state.region = new MapView.AnimatedRegion({
-          latitude: position.coords.latitude | this.state.region.latitude,
-          longitude: position.coords.longitude | this.state.region.longitude,
-          ...defaultOpts
-        });
+       this.state.region.latitude = position.coords.latitude | this.state.region.latitude
+       this.state.region.longitude = position.coords.longitude | this.state.region.longitude
      });
   }
 
@@ -349,42 +308,42 @@ class Main extends React.Component {
      if (shouldBeMovable !== canMoveHorizontal) {
        this.setState({ canMoveHorizontal: shouldBeMovable });
        if (!shouldBeMovable) {
-         const  coordinate  = carWash[index];
+         const  coordinate  = carWash[index]
          region.stopAnimation();
          region.timing({
-           latitude: scrollY.interpolate({
-             inputRange: [0, BREAKPOINT1],
-             outputRange: [
-               coordinate.latitude,
-               coordinate.latitude ,
-             ],
-             extrapolate: 'clamp',
-           }),
-           latitudeDelta: scrollY.interpolate({
-             inputRange: [0, BREAKPOINT1],
-             outputRange: [LATITUDE_DELTA, LATITUDE_DELTA * 0.5],
-             extrapolate: 'clamp',
-           }),
-           longitudeDelta: scrollY.interpolate({
-             inputRange: [0, BREAKPOINT1],
-             outputRange: [LONGITUDE_DELTA, LONGITUDE_DELTA * 0.5],
-             extrapolate: 'clamp',
-           }),
-           duration: 0,
-         }).start();
+            latitude: scrollY.interpolate({
+              inputRange: [0, BREAKPOINT1],
+              outputRange: [
+                coordinate.latlng.latitude,
+                coordinate.latlng.latitude - (LATITUDE_DELTA * 0.5 * 0.375),
+              ],
+              extrapolate: 'clamp',
+            }),
+            latitudeDelta: scrollY.interpolate({
+              inputRange: [0, BREAKPOINT1],
+              outputRange: [LATITUDE_DELTA, LATITUDE_DELTA * 0.5],
+              extrapolate: 'clamp',
+            }),
+            longitudeDelta: scrollY.interpolate({
+              inputRange: [0, BREAKPOINT1],
+              outputRange: [LONGITUDE_DELTA, LONGITUDE_DELTA * 0.5],
+              extrapolate: 'clamp',
+            }),
+            duration: 0,
+          }).start();
        } else {
-         region.stopAnimation();
-         region.timing({
-           latitude: scrollX.interpolate({
-             inputRange: carWash.map((m, i) => i * SNAP_WIDTH),
-             outputRange: carWash.map(m => m.latitude),
-           }),
-           longitude: scrollX.interpolate({
-             inputRange: carWash.map((m, i) => i * SNAP_WIDTH),
-             outputRange: carWash.map(m => m.longitude),
-           }),
-           duration: 0,
-         }).start();
+        region.stopAnimation();
+        region.timing({
+          latitude: scrollX.interpolate({
+            inputRange: carWash.map((m, i) => i * SNAP_WIDTH),
+            outputRange: carWash.map(m => m.latlng.latitude),
+          }),
+          longitude: scrollX.interpolate({
+            inputRange: carWash.map((m, i) => i * SNAP_WIDTH),
+            outputRange: carWash.map(m => m.latlng.longitude),
+          }),
+          duration: 0,
+        }).start();
        }
      }
    }
@@ -421,13 +380,25 @@ class Main extends React.Component {
               style={styles.map}
               region={this.state.region}
               onRegionChange={this.onRegionChange} >
-              { this.state.carWash.map((marker, key)  => {
+              { this.state.carWash.map((marker, i)  => {
+                const {
+                   selected,
+                   markerOpacity,
+                   markerScale,
+                 } = animations[i];
                   return (
                    <MapView.Marker
                      coordinate={marker.latlng}
                      title={marker.name}
+                     key={marker.id}
                      description={JSON.stringify(marker.latlng)} >
-                     <CarWash style={{ opacity: 1 }} amount={marker.amount} selected={{true}} />
+                     <CarWash amount={marker.amount} selected={{true}}
+                     style={{
+                        opacity: markerOpacity,
+                        transform: [
+                          { scale: markerScale },
+                        ],
+                      }} />
                   </MapView.Marker>)
                })
              }
@@ -435,8 +406,23 @@ class Main extends React.Component {
             <View style={styles.itemContainer}>
                {
                  this.state.carWash.map((marker, i) => {
+                   const {
+                    translateY,
+                    translateX,
+                    scale,
+                    opacity,
+                  } = animations[i];
                  return (
-                   <Animated.View key={marker.id} style={[styles.item ]} >
+                   <Animated.View
+                    key={marker.id}
+                    style={[styles.item, {
+                    opacity,
+                    transform: [
+                      { translateY },
+                      { translateX },
+                      { scale },
+                    ],
+                    }]} >
                     <Text> {marker.name} </Text>
                     <Text> ${marker.amount} </Text>
                     <Text> {marker.latlng.latitude} </Text>
@@ -451,6 +437,42 @@ class Main extends React.Component {
     )
   }
 }
+
+Main.propTypes = {
+  provider: MapView.ProviderPropType,
+};
+
+const styles = StyleSheet.create({
+ container: {
+   ...StyleSheet.absoluteFillObject,
+ },
+ title: {
+   color:"black"
+ },
+ map: {
+     ...StyleSheet.absoluteFillObject,
+
+ },
+ item: {
+   width: ITEM_WIDTH,
+   height: screen.height + (2 * ITEM_PREVIEW_HEIGHT),
+   backgroundColor: 'red',
+   marginHorizontal: ITEM_SPACING / 2,
+   overflow: 'hidden',
+   borderRadius: 3,
+   borderColor: '#000',
+   alignItems:"center",
+ },
+ itemContainer: {
+    backgroundColor: 'transparent',
+    flexDirection: 'row',
+    paddingHorizontal: (ITEM_SPACING / 2) + ITEM_PREVIEW,
+    position: 'absolute',
+    // top: screen.height - ITEM_PREVIEW_HEIGHT - 64,
+    paddingTop: screen.height - ITEM_PREVIEW_HEIGHT - 64,
+    // paddingTop: !ANDROID ? 0 : screen.height - ITEM_PREVIEW_HEIGHT - 64,
+  },
+});
 
 reactMixin(Main.prototype, TimerMixin)
 export default connect(mapStateToProps, mapDispatchToProps)(Main)
